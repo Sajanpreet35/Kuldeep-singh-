@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Super Mini ChatGPT - Unlimited Memory AI</title>
+    <style>
+        body { font-family: Arial; text-align:center; background:#111; color:#fff; }
+        #box { width:90%; margin:auto; padding:20px; }
+        input { width:70%; padding:10px; border-radius:5px; }
+        button { padding:10px 20px; margin:10px; border-radius:5px; cursor:pointer; }
+        #answer { padding:15px; background:#222; border-radius:10px; margin-top:20px; }
+    </style>
+</head>
+<body>
+
+<h2>🔥 Super Mini ChatGPT — Unlimited Memory + Auto Knowledge</h2>
+<input id="q" placeholder="Ask anything..." />
+<button onclick="ask()">Ask</button>
+
+<div id="answer"></div>
+
+<script>
+// -------------- GITHUB CONFIG -----------------
+const USER  = "YOUR_GITHUB_USERNAME";   // << बदलना है
+const REPO  = "YOUR_REPO_NAME";         // << बदलना है
+const FILE  = "memory.json";            
+const TOKEN = "YOUR_GITHUB_TOKEN";      // << बदलना है
+
+let memorySha = "";
+
+// -------------- LOAD MEMORY -----------------
+async function loadMemory() {
+    let url = `https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`;
+    let res = await fetch(url);
+    let json = await res.json();
+
+    memorySha = json.sha;
+    return JSON.parse(atob(json.content));
+}
+
+// -------------- SAVE MEMORY -----------------
+async function saveMemory(data) {
+    const content = btoa(JSON.stringify(data, null, 2));
+
+    await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`, {
+        method: "PUT",
+        headers: {
+            "Authorization": `token ${TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            message: "AI Memory Update",
+            content: content,
+            sha: memorySha
+        })
+    });
+}
+
+// -------------- AUTO KNOWLEDGE COLLECTOR ----------
+async function autoKnowledge(memory) {
+    let news = await fetch("https://api.publicapis.org/entries").then(r => r.json());
+    memory.autoNews = news.entries.slice(0, 3);
+    return memory;
+}
+
+// -------------- FREE LLM API -------------------
+async function callLLM(prompt) {
+    let r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json",
+            "Authorization":"Bearer FREE_GROQ_KEY" // << अपना key डालना है (free)
+        },
+        body:JSON.stringify({
+            model:"gemma-7b-it",
+            messages:[{ role:"user", content:prompt }]
+        })
+    });
+    let data = await r.json();
+    return data.choices[0].message.content;
+}
+
+// -------------- ASK FUNCTION -----------------
+async function ask() {
+    let q = document.getElementById("q").value;
+    let memory = await loadMemory();
+    memory = await autoKnowledge(memory);
+
+    let prompt = `
+You are a smart AI with unlimited memory stored in GitHub.
+
+MEMORY:
+${JSON.stringify(memory)}
+
+User: ${q}
+AI:
+    `;
+
+    let answer = await callLLM(prompt);
+    document.getElementById("answer").innerText = answer;
+
+    memory.conversation.push({q:q, a:answer});
+    await saveMemory(memory);
+}
+</script>
+
+</body>
+</html>
